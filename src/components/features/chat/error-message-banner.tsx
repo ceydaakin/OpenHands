@@ -9,6 +9,8 @@ import { cn } from "#/utils/utils";
 import type { ErrorClassification } from "@openhands/typescript-client";
 
 interface ErrorMessageBannerProps {
+  /** Names the agent that failed (e.g. "Planner") when it is not the main one. */
+  label?: string;
   message: string;
   /** Structured error code (e.g. "ACPAuthRequired") used to pick a header. */
   code?: string | null;
@@ -24,6 +26,7 @@ interface ErrorMessageBannerProps {
 const DEFAULT_MAX_COLLAPSED_CHARS = 220;
 
 export function ErrorMessageBanner({
+  label,
   message,
   code,
   onDismiss,
@@ -121,6 +124,14 @@ export function ErrorMessageBanner({
         />
       )}
       <div className="min-w-0 flex-1">
+        {label && (
+          <div
+            className="text-xs font-semibold text-muted"
+            data-testid="error-message-banner-label"
+          >
+            {label}
+          </div>
+        )}
         {headerKey && (
           <div
             className="text-sm font-medium text-foreground"

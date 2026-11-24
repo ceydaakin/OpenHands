@@ -883,6 +883,65 @@ describe("ChatInterface - Pending message queue", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows a planner-labeled banner beside the main one and dismisses each separately (#20045)", () => {
+    const store = useErrorMessageStore.getState();
+    store.setErrorMessage(
+      "Code agent error",
+      "conversation",
+      "ACPAuthRequired",
+    );
+    store.setErrorMessage(
+      "Planner error",
+      "conversation",
+      "ACPAuthRequired",
+      null,
+      "planner",
+    );
+    renderInterface();
+
+    const banners = screen.getAllByTestId("error-message-banner");
+    expect(banners).toHaveLength(2);
+    expect(banners[0]).toHaveTextContent("Code agent error");
+    expect(
+      within(banners[0]).queryByTestId("error-message-banner-label"),
+    ).not.toBeInTheDocument();
+    expect(banners[1]).toHaveTextContent("Planner error");
+    expect(
+      within(banners[1]).getByTestId("error-message-banner-label"),
+    ).toHaveTextContent(I18nKey.COMMON$PLANNER);
+    expect(
+      within(banners[1]).getByTestId("error-message-banner-reauth"),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(banners[1]).getByTestId("error-message-banner-dismiss"),
+    );
+    expect(useErrorMessageStore.getState().plannerError).toBeNull();
+    expect(screen.getByText("Code agent error")).toBeVisible();
+    expect(screen.queryByText("Planner error")).not.toBeInTheDocument();
+
+    act(() =>
+      useErrorMessageStore
+        .getState()
+        .setErrorMessage(
+          "Planner error",
+          "conversation",
+          null,
+          null,
+          "planner",
+        ),
+    );
+    const mainBanner = screen
+      .getAllByTestId("error-message-banner")
+      .find((banner) => banner.textContent?.includes("Code agent error"))!;
+    fireEvent.click(
+      within(mainBanner).getByTestId("error-message-banner-dismiss"),
+    );
+    expect(useErrorMessageStore.getState().errorMessage).toBeNull();
+    expect(screen.getByText("Planner error")).toBeVisible();
+    act(() => useErrorMessageStore.getState().removeErrorMessage());
+  });
+
   it("shows the message in 'sending' state immediately when submitted", async () => {
     let resolveSend: ((value: unknown) => void) | undefined;
     mockSend.mockImplementation(

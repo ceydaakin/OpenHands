@@ -2323,9 +2323,10 @@ describe("Conversation websocket behavior", () => {
         },
       );
       renderProvider({ subConversations: [makeSubConversation()] });
+      const role = source === "main" ? "main" : "planner";
       useErrorMessageStore
         .getState()
-        .setErrorMessage("disconnected", "connection");
+        .setErrorMessage("disconnected", "connection", null, null, role);
       const dispatch =
         source === "main" ? dispatchMainFrame : dispatchPlanningFrame;
       dispatch({ type: "item_started", item_id: "delta", attempt: 1 });
@@ -2350,6 +2351,7 @@ describe("Conversation websocket behavior", () => {
         }),
       ]);
       expect(useErrorMessageStore.getState().errorMessage).toBeNull();
+      expect(useErrorMessageStore.getState().plannerError).toBeNull();
     },
   );
 
@@ -2405,9 +2407,9 @@ describe("Conversation websocket behavior", () => {
       content: "Planning",
       isFromPlanningAgent: true,
     });
-    expect(useErrorMessageStore.getState().errorClassification).toEqual(
-      classification,
-    );
+    expect(
+      useErrorMessageStore.getState().plannerError?.errorClassification,
+    ).toEqual(classification);
     expect(socketCapture.trackError).toHaveBeenCalledWith(
       expect.objectContaining({
         classification,
@@ -2573,9 +2575,11 @@ describe("Conversation websocket behavior", () => {
     });
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
-    useErrorMessageStore.getState().setErrorMessage("temporary", "connection");
+    useErrorMessageStore
+      .getState()
+      .setErrorMessage("temporary", "connection", null, null, "planner");
     dispatchPlanning(makeMessageEvent("37-normal", "assistant", ["ready"]));
-    expect(useErrorMessageStore.getState().errorMessage).toBeNull();
+    expect(useErrorMessageStore.getState().plannerError).toBeNull();
     expect(consumeMatchingPendingMessage).not.toHaveBeenCalled();
     expect(socketCapture.trackError).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
@@ -2586,11 +2590,12 @@ describe("Conversation websocket behavior", () => {
       code: "PlannerUnavailable",
       detail: "Planner failed",
     });
-    expect(useErrorMessageStore.getState()).toMatchObject({
+    expect(useErrorMessageStore.getState().plannerError).toMatchObject({
       errorMessage: "Planner failed",
       errorType: "conversation",
       errorCode: "PlannerUnavailable",
     });
+    expect(useErrorMessageStore.getState().errorMessage).toBeNull();
     expect(socketCapture.trackError).toHaveBeenCalledWith(
       expect.objectContaining({
         source: "planning_conversation",
@@ -2843,6 +2848,111 @@ describe("Conversation websocket behavior", () => {
       expect.any(SyntaxError),
     );
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  describe("planner errors keep their own slot (#20045)", () => {
+    const convError = (id: string, code: string, detail: string) => ({
+      ...baseEvent(id),
+      kind: "ConversationErrorEvent",
+      code,
+      detail,
+    });
+
+    it("a planner error does not replace the code agent's error", () => {
+      renderProvider({ subConversations: [makeSubConversation()] });
+      dispatchMain(convError("1", "ACPAuthRequired", "Code agent error"));
+      dispatchPlanning(convError("2", "ACPAuthRequired", "Planner error"));
+
+      const state = useErrorMessageStore.getState();
+      expect(state).toMatchObject({
+        errorMessage: "Code agent error",
+        errorCode: "ACPAuthRequired",
+      });
+      expect(state.plannerError).toMatchObject({
+        errorMessage: "Planner error",
+        errorCode: "ACPAuthRequired",
+      });
+    });
+
+    it("a code-agent error does not replace the planner's error", () => {
+      renderProvider({ subConversations: [makeSubConversation()] });
+      dispatchPlanning(convError("1", "ACPPromptError", "Planner error"));
+      dispatchMain(convError("2", "ACPPromptError", "Code agent error"));
+
+      const state = useErrorMessageStore.getState();
+      expect(state.errorMessage).toBe("Code agent error");
+      expect(state.plannerError?.errorMessage).toBe("Planner error");
+    });
+
+    it("routes a session ErrorFrame to the socket's own role", () => {
+      renderProvider({ subConversations: [makeSubConversation()] });
+      dispatchPlanningFrame({
+        type: "error",
+        code: "BadInput",
+        detail: "planner rejected",
+      });
+      expect(useErrorMessageStore.getState().errorMessage).toBeNull();
+      expect(useErrorMessageStore.getState().plannerError).toMatchObject({
+        errorMessage: "planner rejected",
+        errorCode: "BadInput",
+      });
+
+      dispatchMainFrame({
+        type: "error",
+        code: "BadInput",
+        detail: "main rejected",
+      });
+      expect(useErrorMessageStore.getState().errorMessage).toBe(
+        "main rejected",
+      );
+      expect(useErrorMessageStore.getState().plannerError?.errorMessage).toBe(
+        "planner rejected",
+      );
+    });
+
+    it("a planner event clears only the planner's connection error", () => {
+      renderProvider({ subConversations: [makeSubConversation()] });
+      useErrorMessageStore
+        .getState()
+        .setErrorMessage("main offline", "connection");
+      useErrorMessageStore
+        .getState()
+        .setErrorMessage(
+          "planner offline",
+          "connection",
+          null,
+          null,
+          "planner",
+        );
+
+      dispatchPlanning(makeMessageEvent("1", "assistant", ["ready"]));
+
+      expect(useErrorMessageStore.getState().plannerError).toBeNull();
+      expect(useErrorMessageStore.getState().errorMessage).toBe("main offline");
+    });
+
+    it("reconnect clears only the role it reconnects", () => {
+      renderProvider({ subConversations: [makeSubConversation()] });
+      dispatchMain(convError("1", "ACPAuthRequired", "Code agent error"));
+      dispatchPlanning(convError("2", "ACPPromptError", "Planner error"));
+
+      useConversationStore.setState({ conversationMode: "plan" });
+      act(() => contextCapture.current?.reconnect());
+      expect(socketCapture.reconnectPlanning).toHaveBeenCalledOnce();
+      expect(useErrorMessageStore.getState().plannerError).toBeNull();
+      expect(useErrorMessageStore.getState().errorMessage).toBe(
+        "Code agent error",
+      );
+
+      dispatchPlanning(convError("3", "ACPPromptError", "Planner error"));
+      useConversationStore.setState({ conversationMode: "code" });
+      act(() => contextCapture.current?.reconnect());
+      expect(socketCapture.reconnectMain).toHaveBeenCalledOnce();
+      expect(useErrorMessageStore.getState().errorMessage).toBeNull();
+      expect(useErrorMessageStore.getState().plannerError?.errorMessage).toBe(
+        "Planner error",
+      );
+    });
   });
 });
 

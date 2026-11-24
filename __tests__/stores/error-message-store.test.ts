@@ -10,6 +10,7 @@ describe("error message store", () => {
       errorType: null,
       errorCode: null,
       errorClassification: null,
+      plannerError: null,
     });
   });
 
@@ -55,7 +56,11 @@ describe("error message store", () => {
     getState().setErrorMessage("boom");
     expect(getState().errorCode).toBeNull();
 
-    getState().setErrorMessage("auth failed", "conversation", "ACPAuthRequired");
+    getState().setErrorMessage(
+      "auth failed",
+      "conversation",
+      "ACPAuthRequired",
+    );
     expect(getState().errorCode).toBe("ACPAuthRequired");
   });
 
@@ -79,7 +84,11 @@ describe("error message store", () => {
   });
 
   it("removeErrorMessage clears the error code too", () => {
-    getState().setErrorMessage("auth failed", "conversation", "ACPAuthRequired");
+    getState().setErrorMessage(
+      "auth failed",
+      "conversation",
+      "ACPAuthRequired",
+    );
     getState().removeErrorMessage();
     expect(getState().errorCode).toBeNull();
   });
@@ -88,5 +97,105 @@ describe("error message store", () => {
     getState().setErrorMessage("offline", "connection", "SomeCode");
     getState().clearConnectionError();
     expect(getState().errorCode).toBeNull();
+  });
+  describe("planner role (#20045)", () => {
+    it("keeps a planner error separate from the main error, in both orders", () => {
+      getState().setErrorMessage("main", "conversation", "ACPAuthRequired");
+      getState().setErrorMessage(
+        "planner",
+        "conversation",
+        "ACPPromptError",
+        null,
+        "planner",
+      );
+      expect(getState().errorMessage).toBe("main");
+      expect(getState().errorCode).toBe("ACPAuthRequired");
+      expect(getState().plannerError).toMatchObject({
+        errorMessage: "planner",
+        errorType: "conversation",
+        errorCode: "ACPPromptError",
+      });
+
+      getState().setErrorMessage("main 2");
+      expect(getState().plannerError?.errorMessage).toBe("planner");
+    });
+
+    it("dismisses one role without clearing the other", () => {
+      getState().setErrorMessage("main");
+      getState().setErrorMessage(
+        "planner",
+        "conversation",
+        null,
+        null,
+        "planner",
+      );
+
+      getState().removeErrorMessage("planner");
+      expect(getState().plannerError).toBeNull();
+      expect(getState().errorMessage).toBe("main");
+
+      getState().setErrorMessage(
+        "planner",
+        "conversation",
+        null,
+        null,
+        "planner",
+      );
+      getState().removeErrorMessage("main");
+      expect(getState().errorMessage).toBeNull();
+      expect(getState().plannerError?.errorMessage).toBe("planner");
+    });
+
+    it("removeErrorMessage without a role clears both (conversation switch)", () => {
+      getState().setErrorMessage("main");
+      getState().setErrorMessage(
+        "planner",
+        "conversation",
+        null,
+        null,
+        "planner",
+      );
+      getState().removeErrorMessage();
+      expect(getState().errorMessage).toBeNull();
+      expect(getState().plannerError).toBeNull();
+    });
+
+    it("clearConnectionError only clears the given role", () => {
+      getState().setErrorMessage("main offline", "connection");
+      getState().setErrorMessage(
+        "planner offline",
+        "connection",
+        null,
+        null,
+        "planner",
+      );
+
+      getState().clearConnectionError("planner");
+      expect(getState().plannerError).toBeNull();
+      expect(getState().errorMessage).toBe("main offline");
+
+      getState().setErrorMessage(
+        "planner offline",
+        "connection",
+        null,
+        null,
+        "planner",
+      );
+      getState().clearConnectionError();
+      expect(getState().errorMessage).toBeNull();
+      expect(getState().plannerError?.errorMessage).toBe("planner offline");
+    });
+
+    it("clearConnectionError keeps a sticky planner error", () => {
+      getState().setErrorMessage(
+        "bad key",
+        "conversation",
+        null,
+        null,
+        "planner",
+      );
+      getState().clearConnectionError("planner");
+      expect(getState().plannerError?.errorMessage).toBe("bad key");
+    });
   });
 });

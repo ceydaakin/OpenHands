@@ -125,6 +125,7 @@ export function ChatInterface({
     errorType,
     errorCode,
     errorClassification,
+    plannerError,
     removeErrorMessage,
     setErrorMessage,
   } = useErrorMessageStore();
@@ -633,7 +634,7 @@ export function ChatInterface({
       );
       const errors = useErrorMessageStore.getState();
       if (errors.errorCode === STARTUP_UPLOAD_ERROR_CODE)
-        errors.removeErrorMessage();
+        errors.removeErrorMessage("main");
     } catch (sendError) {
       const sendErrorMessage =
         sendError instanceof Error
@@ -928,7 +929,7 @@ export function ChatInterface({
                 link={budgetLimitError?.link}
                 code={errorCode}
                 classification={errorClassification}
-                onDismiss={removeErrorMessage}
+                onDismiss={() => removeErrorMessage("main")}
                 onRetry={
                   errorMessage === SERVER_CONNECTION_ERROR_MESSAGE
                     ? () => conversationWebSocket?.reconnect()
@@ -938,6 +939,21 @@ export function ChatInterface({
                 // (OHE-3457).
                 onReauth={
                   isAcpAuthErrorCode(errorCode) && getLockedCloudHost() === null
+                    ? () => navigate("/settings/agents")
+                    : undefined
+                }
+              />
+            )}
+            {plannerError?.errorMessage && (
+              <ErrorMessageBanner
+                label={t(I18nKey.COMMON$PLANNER)}
+                message={plannerError.errorMessage}
+                code={plannerError.errorCode}
+                classification={plannerError.errorClassification}
+                onDismiss={() => removeErrorMessage("planner")}
+                onReauth={
+                  isAcpAuthErrorCode(plannerError.errorCode) &&
+                  getLockedCloudHost() === null
                     ? () => navigate("/settings/agents")
                     : undefined
                 }
