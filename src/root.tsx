@@ -50,6 +50,7 @@ import { useRestoreMarsTunnels } from "#/hooks/use-mars-tunnel-backend";
 import { QUERY_KEYS } from "#/hooks/query/query-keys";
 import { AgentServerUIRoot } from "#/components/providers";
 import { TelemetryConsentBanner } from "#/components/features/analytics/telemetry-consent-banner";
+import { SkipToMainContentLink } from "#/components/shared/skip-to-main-content-link";
 import { buildAgentCanvasPath } from "#/utils/base-path";
 import { useOnboardingCompletion } from "#/components/features/onboarding/use-onboarding-completion";
 import {
@@ -116,6 +117,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body data-agent-server-ui="" className="m-0">
         <AgentServerUIRoot contentClassName="h-dvh min-h-0">
+          <SkipToMainContentLink />
           <ColorThemeApplier />
           {children}
           <Toaster toastOptions={TOAST_OPTIONS} />

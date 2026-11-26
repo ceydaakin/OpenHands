@@ -124,7 +124,7 @@ export default function ApiKeyEntryScreen() {
   );
 
   return (
-    <div
+    <main
       data-testid="api-key-entry-screen"
       className="flex min-h-screen items-center justify-center bg-canvas-base px-6"
     >
@@ -188,6 +188,6 @@ export default function ApiKeyEntryScreen() {
           />
         </div>
       </div>
-    </div>
+    </main>
   );
 }

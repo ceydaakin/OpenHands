@@ -449,6 +449,24 @@
     "zh-TW": "模式:",
     "id": "Pola:"
   },
+  "COMMON$SKIP_TO_MAIN_CONTENT": {
+    "ar": "تخطَّ إلى المحتوى الرئيسي",
+    "ca": "Salta al contingut principal",
+    "de": "Zum Hauptinhalt springen",
+    "en": "Skip to main content",
+    "es": "Saltar al contenido principal",
+    "fr": "Aller au contenu principal",
+    "it": "Vai al contenuto principale",
+    "ja": "メインコンテンツへスキップ",
+    "ko-KR": "본문으로 건너뛰기",
+    "no": "Hopp til hovedinnhold",
+    "pt": "Pular para o conteúdo principal",
+    "tr": "Ana içeriğe geç",
+    "uk": "Перейти до основного вмісту",
+    "zh-CN": "跳到主要内容",
+    "zh-TW": "跳至主要內容",
+    "id": "Lewati ke konten utama"
+  },
   "COMMON$INCLUDE": {
     "ar": "تضمين:",
     "ca": "Inclou:",
